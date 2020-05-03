@@ -1,21 +1,31 @@
 # tectonicdb
 
-[![Build Status](https://travis-ci.org/rickyhan/tectonicdb.svg?branch=master)](https://travis-ci.org/rickyhan/tectonicdb)
-[![Crates.io](https://img.shields.io/crates/v/tectonicdb.svg)](https://crates.io/crates/tectonicdb)
+[![build](https://github.com/0b01/tectonicdb/workflows/Rust/badge.svg)](https://github.com/0b01/tectonicdb/actions?query=workflow%3ARust)
+[![crate.io](https://img.shields.io/crates/v/tdb-core.svg)](https://crates.io/crates/tdb-core)
+[![doc.rs](https://docs.rs/tdb_core/badge.svg)](https://docs.rs/crate/tdb_core)
+![Minimum Rust version](https://img.shields.io/badge/rustc-1.40+-yellow.svg)
+![Rust stable](https://img.shields.io/badge/rust-stable-green.svg)
 
-tectonicdb is a fast, highly compressed standalone datastore and streaming protocol for order book ticks.
+| crate | docs.rs | crate.io |
+| - | - | ------ |
+| tectonicdb  | [![doc.rs](https://docs.rs/tectonicdb/badge.svg)](https://docs.rs/crate/tectonicdb) | [![crate.io](https://img.shields.io/crates/v/tectonicdb.svg)](https://crates.io/crates/tectonicdb)  |
+| tdb-core  | [![doc.rs](https://docs.rs/tdb_core/badge.svg)](https://docs.rs/crate/tdb_core) | [![crate.io](https://img.shields.io/crates/v/tdb-core.svg)](https://crates.io/crates/tdb-core)  |
+| tdb-server-core  | [![doc.rs](https://docs.rs/tdb_server_core/badge.svg)](https://docs.rs/crate/tdb_server_core) | [![crate.io](https://img.shields.io/crates/v/tdb-server-core.svg)](https://crates.io/crates/tdb-server-core)  |
+| tdb-cli  | [![doc.rs](https://docs.rs/tdb_cli/badge.svg)](https://docs.rs/crate/tdb_cli) | [![crate.io](https://img.shields.io/crates/v/tdb-cli.svg)](https://crates.io/crates/tdb-cli)  |
+
+tectonicdb is a fast, highly compressed standalone database and streaming protocol for order book ticks.
 
 ## Why
 
-This software is motivated by reducing expenditure. 1TB stored on Google Cloud PostgreSQL was too expensive and too slow. Since financial data is usually read and stored in bulk, it is possible to convert into a more efficient format.
-
-* Uses a simple binary file format: Dense Tick Format(DTF)
+* Uses a simple and efficient binary file format: Dense Tick Format(DTF)
 
 * Stores order book tick data tuple of shape: `(timestamp, seq, is_trade, is_bid, price, size)`.
 
 * Sorted by timestamp + seq
 
-* 12 bytes per row
+* 12 bytes per orderbook event
+
+* 600,000 inserts per thread second
 
 ## Installation
 
@@ -23,46 +33,42 @@ There are several ways to install tectonicdb.
 
 1.  **Binaries**
 
-Binaries are available for [download](https://github.com/rickyhan/tectonic/releases). Make sure to put the path to the binary into your PATH. Currently only build is for Linux x86_64.
+Binaries are available for [download](https://github.com/0b01/tectonicdb/releases). Make sure to put the path to the binary into your PATH. Currently only build is for Linux x86_64.
 
-2.  **Crates.io**
+2.  **Crates**
 
-Requires Rust. Once you have Rust installed, simply run:
+```
+cargo install tectonicdb
+```
 
-    cargo install tectonicdb
-
-This will download and compile `tectonic-server` and `tectonic-cli`.
+This command will download `tdb`, `tdb-server`, `dtftools` binaries from crates.io and build locally.
 
 3.  **GitHub**
 
 To contribute you will need the copy of the source code on your local machine.
 
-    git clone https://github.com/rickyhan/tectonic
-    cd tectonic
-    cargo build --lib
-    cargo build --bin tectonic-server
-    cargo build --bin tectonic-cli
+    git clone https://github.com/0b01/tectonicdb
+    cd tectonicdb
+    cargo build --release
+    cargo run --release tdb-server
 
-The binaries can be found under `target/release/debug` folder.
+The binaries can be found under `target/release`.
 
 ## How to use
 
 It's very easy to setup.
 
 ```
-chmod +x tectonic-server
-./tectonic-server --help
+./tdb-server --help
 ```
 
 For example:
 
 ```bash
-./tectonic-server -vv -a -i 10000
+./tdb-server -vv -a -i 10000
 # run the server on INFO verbosity
-# turn on autoflush and flush every 10000
+# turn on autoflush for every 10000 inserts per orderbook
 ```
-
-This sets log verbosity to max and maximum connection to 1000.
 
 ### Configuration
 
@@ -70,42 +76,98 @@ To config the Google Cloud Storage and Data Collection Backend integration, the 
 
 | Variable Name                 | Default      | Description                                                                                                                                   |
 | ----------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GCLOUD_OAUTH_TOKEN`          | _unset_      | Token used to authenticate with Google Cloud for uploading DTF files                                                                          |
-| `GCLOUD_BUCKET_NAME`          | `tick_data`  | Name of the bucket in which uploaded DTF files are stored                                                                                     |
-| `GCLOUD_FOLDER`               | _unset_      | Name of the folder inside of the bucket into which the DTF files are stored                                                                   |
-| `GCLOUD_REMOVE_ON_UPLOAD`     | true         | If true, the uploaded DTF files are deleted after upload                                                                                      |
-| `GCLOUD_UPLOAD_INTERVAL_SECS` | 30           | Every `n` seconds, all files over `GCLOUD_MIN_FILE_SIZE_BYTES` will be uploaded to Google Cloud Storage and their metadata posted to the DCB. |
-| `GCLOUD_MIN_FILE_SIZE_BYTES`  | 1024 \* 1024 | Files over this size in bytes will be uploaded every 30 seconds                                                                               |
-| `DCB_URL`                     | _unset_      | The URL of the Data Collection Backend's batch ingestion endpoint (leave unset if you don't know what the DCB is or aren't using it)          |
-| `DTF_METADATA_TAGS`           | `""`         | An array of tags that will be included in metadata for DTF files                                                                              |
-| `TECTONICDB_HOST`             | 0.0.0.0      | The host to which the database will bind                                                                                                      |
-| `TECTONICDB_PORT`             | 9001         | The port that the database will listen on                                                                                                     |
-| `TECTONICDB_DTF_FOLDER`       | db           | Name of the directory in which DTF files will be stored                                                                                       |
-| `TECTONICDB_AUTOFLUSH`        | false        | If `true`, recorded orderbook data will automatically be flushed to DTF files every `interval` inserts.                                       |
-| `TECTONICDB_FLUSH_INTERVAL`   | 1000         | Every `interval` inserts, if `autoflush` is enabled, DTF files will be written from memory to disk.                                           |
-| `TECTONICDB_HIST_GRANULARITY` | 30           | Record history granularity level                                                                                                              |
-| `TECTONICDB_LOG_FILE_NAME`    | tectonic.log | Filename of the log file for the database                                                                                                     |
-| `TECTONICDB_HIST_Q_CAPACITY`  | 300          |
+| `TDB_HOST`             | 0.0.0.0      | The host to which the database will bind                                                                                                      |
+| `TDB_PORT`             | 9001         | The port that the database will listen on                                                                                                     |
+| `TDB_DTF_FOLDER`       | db           | Name of the directory in which DTF files will be stored                                                                                       |
+| `TDB_AUTOFLUSH`        | false        | If `true`, recorded orderbook data will automatically be flushed to DTF files every `interval` inserts.                                       |
+| `TDB_FLUSH_INTERVAL`   | 1000         | Every `interval` inserts, if `autoflush` is enabled, DTF files will be written from memory to disk.                                           |
+| `TDB_GRANULARITY`      | 0            | Record history granularity level                                                                                                              |
+| `TDB_LOG_FILE_NAME`    | tdb.log      | Filename of the log file for the database                                                                                                     |
+| `TDB_Q_CAPACITY`       | 300          | Capacity of the circular queue for recording history                                                                                          |
+
+## Client API
+
+| Command | Description |
+| :--- | :--- |
+| HELP | Prints help |
+| PING | Responds PONG |
+| INFO | Returns info about table schemas |
+| PERF | Returns the answercount of items over time |
+| LOAD \[orderbook\] | Load orderbook from disk to memory |
+| USE \[orderbook\] | Switch the current orderbook |
+| CREATE \[orderbook\] | Create orderbook |
+| GET \[n\] FROM \[orderbook\] | Returns items |
+| GET \[n\] | Returns n items from current orderbook |
+| COUNT | Count of items in current orderbook |
+| COUNT ALL | Returns total count from all orderbooks |
+| CLEAR | Deletes everything in current orderbook |
+| CLEAR ALL | Drops everything in memory |
+| FLUSH | Flush current orderbook to "Howdisk can|
+| FLUSHALL | Flush everything from memory to disk |
+| SUBSCRIBE \[orderbook\] | Subscribe to updates from orderbook |
+| EXISTS \[orderbook\] | Checks if orderbook exists |
+| SUBSCRIBE \[orderbook\] | Subscribe to orderbook |
+
+### Data commands
+
+```
+USE [dbname]
+ADD [ts], [seq], [is_trade], [is_bid], [price], [size];
+INSERT 1505177459.685, 139010, t, f, 0.0703620, 7.65064240; INTO dbname
+```
 
 ## Monitoring
 
-There is a history granularity option that sets the interval (in second) to periodically record item count for each data store. Then a client can call `PERF` command and retreive historical item counts in JSON.
+TectonicDB supports monitoring/alerting by periodically sending its usage info to an InfluxDB instance:
+
+```bash
+    --influx-db <influx_db>                        influxdb db
+    --influx-host <influx_host>                    influxdb host
+    --influx-log-interval <influx_log_interval>    influxdb log interval in seconds (default is 60)
+```
+
+As a concrete example,
+
+```bash
+...
+$ influx
+> CREATE DATABASE market_data;
+> ^D
+$ tdb --influx-db market_data --influx-host http://localhost:8086 --influx-log-interval 20
+...
+```
+
+TectonicDB will send field values `disk={COUNT_DISK},size={COUNT_MEM}` with tag `ob={ORDERBOOK}` to `market_data` measurement which is the same as the dbname.
+
+Additionally, you can query usage information directly with `INFO` and `PERF` commands:
+
+1. `INFO` reports the current tick count in memory and on disk.
+
+2. `PERF` returns recorded tick count history whose granularity can be configured.
 
 ## Logging
 
-Log file defaults to `tectonic.log`.
+Log file defaults to `tdb.log`.
 
 ## Testing
 
 ```bash
 export RUST_TEST_THREADS=1
+cargo test
 ```
 
-Tests must be run sequentially because of file dependencies issues: some tests generate dtf file for others.
+Tests must be run sequentially because some tests depend on dtf files that other tests generate.
 
+## Benchmark
+
+tdb client comes with a benchmark mode. This command inserts 1M records into the tdb.
+
+```bash
+tdb -b 1000000
+```
 ## Using dtf files
 
-Tectonic comes with a commandline tool `dtfcat` to inspect the file metadata and all the stored rows into either JSON or CSV.
+Tectonic comes with a commandline tool `dtfcat` to inspect the file metadata and all the stored events into either JSON or CSV.
 
 Options:
 
@@ -155,6 +217,8 @@ Language bindings:
 
 * [x] Query by timestamp
 
-# Note
+# Changelog
 
-This software is release under GNU General Public License which means you are **required** to contribute back and disclose source.
+* 0.5.0: InfluxDB monitoring plugin and improved command line arguments
+* 0.4.0: iterator-based APIs for handling DTF files and various quality of life improvements
+* 0.3.0: Refactor to async

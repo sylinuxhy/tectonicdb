@@ -6,7 +6,7 @@ import time
 import sys
 
 class TectonicDB():
-    def __init__(self, host="localhost", port=9001):
+    def __init__(self, host="0.0.0.0", port=9001):
 
         self.subscribed = False
 
@@ -80,7 +80,7 @@ class TectonicDB():
         self.cmd("DDAKLUB")
 
     def getall(self):
-        return json.loads(self.cmd("GET ALL AS JSON"));
+        return json.loads(self.cmd("GET ALL AS JSON"))
 
     def get(self, n):
         success, ret = self.cmd("GET {} AS JSON".format(n))
@@ -119,3 +119,10 @@ class TectonicDB():
     
     def poll(self):
         return self.cmd("")
+
+
+
+if __name__ == "__main__":
+    a =  TectonicDB()
+    res = a.getall()
+    print(res)

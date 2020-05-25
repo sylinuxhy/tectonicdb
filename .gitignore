@@ -29,3 +29,7 @@ plot.py
 bnc_neo_btc.dtf
 
 *.dtf
+
+
+.vscode/*
+.idea/*
